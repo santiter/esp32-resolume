@@ -1,0 +1,138 @@
+
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include <ArtnetWifi.h>
+#include <FastLED.h>
+//#include <Adafruit_SSD1306.h>
+
+
+
+//Wifi settings - be sure to replace these with the WiFi network that your computer is connected to
+//const char* ssid = "San tito";
+//const char* password = "santito123";
+
+const char* ssid = "flor";
+const char* password = "florcita";
+
+//const char* ssid = "santimac";
+//const char* password = "santito123";
+
+
+
+//const char* ssid = "arduinitoled";
+//const char* password = "Mandalita321";
+
+//const char* ssid = "CHARANGO_2G";
+//const char* password = "Juegue2020";
+
+
+
+
+//casa alvarito
+//const char* ssid = "MOVISTAR_PLUS_15E4";
+//const char* password = "ED95E31A6631FD76F129";
+
+
+//const char* ssid = "Fibertel WiFi206 2.4GHz";
+//const char* password = "01416295061";
+
+//const char* ssid = "HAIMNEY";
+//const char* password = "Aurorita";
+
+//TURRO AUN NO FUNCIONO
+//const char* ssid = "MIWIFI_5G_GVat";
+//const char* password = "kwihyrN6";
+
+//const char* ssid = "Bridge 48 Backstage 5G";
+//const char* password = "Bridge_48_Backstage";
+
+//Bridge_48_Backstage
+
+// LED Strip
+//const int numLeds = 120; // Change if your setup has more or less LED's
+const int numLeds = 170; // Change if your setup has more or less LED's
+const int numberOfChannels = numLeds * 3; // Total number of DMX channels you want to receive (1 led = 3 channels) // aca cambie 3 por 6
+#define DATA_PIN 23 //The data pin that the WS2812 strips are connected to.
+CRGB leds[numLeds];
+
+// Artnet settings
+ArtnetWifi artnet;
+const int startUniverse = 0;
+
+bool sendFrame = 1;
+int previousDataLength = 0;
+
+// connect to wifi – returns true if successful or false if not
+boolean ConnectWifi(void)
+{
+  boolean state = true;
+  int i = 0;
+
+  WiFi.begin(ssid, password);
+  //  WiFi.begin(ssid);
+
+  Serial.println("");
+  Serial.println("Connecting to WiFi");
+
+  // Wait for connection
+  Serial.print("Connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    if (i > 20) {
+      state = false;
+      break;
+    }
+    i++;
+  }
+  if (state) {
+    Serial.println("");
+    Serial.print("Connected to ");
+    Serial.println(ssid);
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("");
+    Serial.println("Connection failed.");
+  }
+
+  return state;
+}
+
+void onDmxFrame(uint16_t universe, uint16_t length, uint8_t sequence, uint8_t* data)
+{
+  sendFrame = 1;
+  // set brightness of the whole strip
+  if (universe == 15)
+  {
+    FastLED.setBrightness(data[0]);
+  }
+  // read universe and put into the right part of the display buffer
+  for (int i = 0; i < length / 3; i++)
+  {
+    int led = i + (universe - startUniverse) * (previousDataLength / 3);
+    if (led < numLeds)
+    {
+      leds[led] = CRGB(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]);
+    }
+  }
+  previousDataLength = length;
+  FastLED.show();
+}
+
+void setup()
+{
+  Serial.begin(115200);
+  ConnectWifi();
+  artnet.begin();
+  FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, numLeds);
+
+  // onDmxFrame will execute every time a packet is received by the ESP32
+  artnet.setArtDmxCallback(onDmxFrame);
+}
+
+void loop()
+{
+  // we call the read function inside the loop
+  artnet.read();
+}
